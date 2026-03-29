@@ -67,11 +67,9 @@ class ConversationUpdate(BaseModel):
 
 class ConversationResponse(BaseModel):
     """Schema for conversation response"""
-    id: int
+    id: str  # UUID
     user_id: int
     title: str
-    model: Optional[str] = None
-    provider: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     message_count: Optional[int] = 0
@@ -83,11 +81,9 @@ class ConversationResponse(BaseModel):
 
 class ConversationWithMessages(BaseModel):
     """Schema for conversation with messages"""
-    id: int
+    id: str  # UUID
     user_id: int
     title: str
-    model: Optional[str] = None
-    provider: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     messages: List[MessageResponse] = []

@@ -37,8 +37,6 @@ async def list_conversations(
             "id": conv.id,
             "user_id": conv.user_id,
             "title": conv.title,
-            "model": conv.model,
-            "provider": conv.provider,
             "created_at": conv.created_at,
             "updated_at": conv.updated_at,
             "message_count": len(messages),
@@ -75,7 +73,7 @@ async def create_conversation(
 
 @router.get("/{conversation_id}", response_model=ConversationWithMessages)
 async def get_conversation(
-    conversation_id: int,
+    conversation_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -105,7 +103,7 @@ async def get_conversation(
 
 @router.patch("/{conversation_id}", response_model=ConversationResponse)
 async def update_conversation(
-    conversation_id: int,
+    conversation_id: str,
     conversation_update: ConversationUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -141,7 +139,7 @@ async def update_conversation(
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_conversation(
-    conversation_id: int,
+    conversation_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
