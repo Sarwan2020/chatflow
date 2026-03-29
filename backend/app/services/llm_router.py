@@ -429,7 +429,11 @@ class LLMRouter:
         if not provider:
             return []
         
-        return await provider.list_models()
+        try:
+            return await provider.list_models()
+        except Exception as e:
+            print(f"Error listing models for {provider_name}: {str(e)}")
+            return []
     
     async def list_all_models(self) -> List[Dict[str, Any]]:
         """List all available models from all providers"""
@@ -438,9 +442,54 @@ class LLMRouter:
             try:
                 models = await provider.list_models()
                 all_models.extend(models)
-            except:
+            except Exception as e:
+                print(f"Error listing models for {provider_name}: {str(e)}")
                 continue
         return all_models
+    
+    async def chat_completion_stream(
+        self,
+        provider_name: str,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ):
+        """Stream chat completion from appropriate provider"""
+        provider = self.get_provider(provider_name)
+        if not provider:
+            raise ValueError(f"Provider '{provider_name}' not found")
+        
+        # For now, use regular completion and yield it
+        # TODO: Implement actual streaming for each provider
+        response = await provider.chat_completion(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=False,
+            **kwargs
+        )
+        
+        # Yield the complete response as chunks
+        content = response.get("content", "")
+        chunk_size = 10  # Characters per chunk
+        
+        for i in range(0, len(content), chunk_size):
+            chunk = content[i:i + chunk_size]
+            yield {
+                "type": "content",
+                "content": chunk
+            }
+        
+        # Yield usage info
+        if "usage" in response:
+            yield {
+                "type": "usage",
+                "prompt_tokens": response["usage"].get("prompt_tokens", 0),
+                "completion_tokens": response["usage"].get("completion_tokens", 0)
+            }
     
     def count_tokens(self, provider_name: str, text: str, model: str) -> int:
         """Count tokens for a specific provider"""

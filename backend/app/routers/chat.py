@@ -148,6 +148,8 @@ async def list_models(
     try:
         models_data = await chat_service.get_available_models(current_user.id)
         
+        print(f"Models data received: {models_data}")  # Debug log
+        
         # Convert to ModelInfo objects
         models = [
             ModelInfo(
@@ -170,6 +172,9 @@ async def list_models(
         )
         
     except Exception as e:
+        print(f"Error in list_models endpoint: {str(e)}")  # Debug log
+        import traceback
+        traceback.print_exc()  # Print full traceback
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching models: {str(e)}"
