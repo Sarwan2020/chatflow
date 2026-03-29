@@ -701,7 +701,9 @@ class ChatService:
                 try:
                     provider_models = await self.router.list_models(provider)
                     models.extend(provider_models)
-                except:
+                except Exception as e:
+                    # Log error but continue with other providers
+                    print(f"Error fetching models from {provider}: {str(e)}")
                     continue
         
         return models
