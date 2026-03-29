@@ -19,7 +19,7 @@ from app.services.auth_service import (
 )
 from app.utils.dependencies import get_current_user
 
-router = APIRouter()
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post(
