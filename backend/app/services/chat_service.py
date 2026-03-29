@@ -167,7 +167,7 @@ class ChatService:
         if not api_key:
             return None
         
-        return decrypt_api_key(api_key.encrypted_key)
+        return decrypt_api_key(api_key.api_key)
     
     def _initialize_provider(self, user_id: int, provider: str) -> bool:
         """Initialize provider with user's API key"""
