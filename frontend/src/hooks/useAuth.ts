@@ -1,16 +1,8 @@
 /**
  * useAuth hook.
  *
- * Custom hook for accessing authentication context.
- * To be implemented in Phase 3 (Authentication).
+ * Re-exports the useAuth hook from AuthContext for convenience.
+ * Other modules can import from either location.
  */
 
-export function useAuth() {
-  // Placeholder - will use AuthContext
-  return {
-    user: null,
-    isAuthenticated: false,
-    isLoading: false,
-    error: null,
-  }
-}
+export { useAuth } from '../contexts/AuthContext'

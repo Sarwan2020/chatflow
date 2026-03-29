@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 
     Startup:
         - Log application start
-        - Initialize any required services
+        - Initialize database tables
 
     Shutdown:
         - Clean up resources
@@ -29,6 +29,14 @@ async def lifespan(app: FastAPI):
     print(f"Starting {settings.app_name} v{settings.app_version}")
     print(f"Environment: {settings.environment}")
     print(f"Debug: {settings.debug}")
+
+    # Ensure all tables exist
+    from app.database import Base, engine
+    from app.models import APIKey, Conversation, Message, TokenUsage, User  # noqa: F401
+
+    Base.metadata.create_all(bind=engine)
+    print("Database tables created / verified")
+
     yield
     print(f"Shutting down {settings.app_name}")
 
@@ -77,14 +85,18 @@ def create_app() -> FastAPI:
         }
 
     # -------------------------------------------------------------------------
-    # Router Registration (to be added in later phases)
+    # Router Registration
     # -------------------------------------------------------------------------
-    # from app.routers import auth, conversations, chat, memory, api_keys, usage
-    # app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-    # app.include_router(conversations.router, prefix="/api/conversations", tags=["Conversations"])
-    # app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+    from app.routers import auth, conversations, chat, api_keys
+
+    app.include_router(auth.router)
+    app.include_router(conversations.router)
+    app.include_router(chat.router)
+    app.include_router(api_keys.router)
+
+    # Future routers (to be added in later phases):
+    # from app.routers import memory, usage
     # app.include_router(memory.router, prefix="/api/memory", tags=["Memory"])
-    # app.include_router(api_keys.router, prefix="/api/keys", tags=["API Keys"])
     # app.include_router(usage.router, prefix="/api/usage", tags=["Usage"])
 
     return app

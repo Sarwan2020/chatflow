@@ -1,17 +1,19 @@
 /**
- * ChatPage component.
+ * ChatPage - Main chat interface page.
  *
- * Main chat page with sidebar and chat interface.
- * To be implemented in Phase 6 (Chat Interface).
+ * Combines sidebar and chat interface with conversation management.
  */
+
+import React from 'react'
+import Sidebar from '../components/sidebar/Sidebar'
+import ChatInterface from '../components/chat/ChatInterface'
+
 export default function ChatPage() {
   return (
-    <div className="min-h-screen flex">
-      <div className="text-center flex-1 flex items-center justify-center">
-        <div>
-          <h1 className="text-2xl font-bold mb-4">Chat</h1>
-          <p className="text-gray-500">To be implemented</p>
-        </div>
+    <div className="flex h-screen bg-white dark:bg-gray-900">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ChatInterface />
       </div>
     </div>
   )
