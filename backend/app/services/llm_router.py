@@ -315,7 +315,7 @@ class RouterAPIProvider(BaseProvider):
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available Router API models"""
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 headers = {
                     "Authorization": f"Bearer {self.api_key}",
                 }
@@ -331,11 +331,49 @@ class RouterAPIProvider(BaseProvider):
                         "id": model["id"],
                         "name": model.get("name", model["id"]),
                         "provider": "router",
+                        "context_length": model.get("context_length", 4096),
+                        "supports_vision": model.get("supports_vision", False),
+                        "supports_function_calling": model.get("supports_function_calling", False)
                     }
                     for model in data.get("data", [])
                 ]
-        except:
-            return []
+        except Exception as e:
+            print(f"Error fetching Router API models: {str(e)}")
+            # Return default popular models as fallback
+            return [
+                {
+                    "id": "gpt-4",
+                    "name": "GPT-4",
+                    "provider": "router",
+                    "context_length": 8192,
+                    "supports_vision": False,
+                    "supports_function_calling": True
+                },
+                {
+                    "id": "gpt-3.5-turbo",
+                    "name": "GPT-3.5 Turbo",
+                    "provider": "router",
+                    "context_length": 4096,
+                    "supports_vision": False,
+                    "supports_function_calling": True
+                },
+                {
+                    "id": "claude-3-opus-20240229",
+                    "name": "Claude 3 Opus",
+                    "provider": "router",
+                    "context_length": 200000,
+                    "supports_vision": True,
+                    "supports_function_calling": True
+                },
+                {
+                    "id": "claude-3-sonnet-20240229",
+                    "name": "Claude 3 Sonnet",
+                    "provider": "router",
+                    "context_length": 200000,
+                    "supports_vision": True,
+                    "supports_function_calling": True
+                }
+            ]
     
     def count_tokens(self, text: str, model: str) -> int:
         """Count tokens (approximate)"""
