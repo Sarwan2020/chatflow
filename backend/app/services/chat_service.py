@@ -265,9 +265,7 @@ class ChatService:
         user_message = Message(
             conversation_id=conversation.id,
             role="user",
-            content=message_content,
-            model=model,
-            provider=provider
+            content=message_content
         )
         self.db.add(user_message)
         self.db.commit()
@@ -289,11 +287,7 @@ class ChatService:
                 conversation_id=conversation.id,
                 role="assistant",
                 content=response["content"],
-                model=response.get("model", model),
-                provider=provider,
-                prompt_tokens=response["usage"]["prompt_tokens"],
-                completion_tokens=response["usage"]["completion_tokens"],
-                total_tokens=response["usage"]["total_tokens"]
+                token_count=response["usage"]["total_tokens"]
             )
             self.db.add(assistant_message)
             
@@ -452,9 +446,7 @@ class ChatService:
         user_message = Message(
             conversation_id=conversation.id,
             role="user",
-            content=message_content,
-            model=model,
-            provider=provider
+            content=message_content
         )
         self.db.add(user_message)
         self.db.commit()
@@ -502,11 +494,7 @@ class ChatService:
                 conversation_id=conversation.id,
                 role="assistant",
                 content=full_response,
-                model=model,
-                provider=provider,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens
+                token_count=total_tokens
             )
             self.db.add(assistant_message)
             
