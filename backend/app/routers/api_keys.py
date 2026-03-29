@@ -35,17 +35,17 @@ async def list_api_keys(
     result = []
     for key in api_keys:
         # Decrypt to get preview
-        decrypted = decrypt_api_key(key.encrypted_key)
+        decrypted = decrypt_api_key(key.api_key)
         
         result.append(APIKeyResponse(
             id=key.id,
             user_id=key.user_id,
             provider=key.provider,
-            name=key.name,
+            name=key.provider,  # Use provider as name since name field doesn't exist
             key_preview=mask_api_key(decrypted),
             is_active=key.is_active,
             created_at=key.created_at,
-            updated_at=key.updated_at
+            updated_at=key.created_at  # Use created_at since updated_at doesn't exist
         ))
     
     return result
@@ -90,11 +90,11 @@ async def create_api_key(
         id=new_key.id,
         user_id=new_key.user_id,
         provider=new_key.provider,
-        name=new_key.name,
+        name=new_key.provider,  # Use provider as name
         key_preview=mask_api_key(api_key_data.key_value),
         is_active=new_key.is_active,
         created_at=new_key.created_at,
-        updated_at=new_key.updated_at
+        updated_at=new_key.created_at  # Use created_at
     )
 
 
