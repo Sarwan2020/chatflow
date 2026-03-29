@@ -78,8 +78,7 @@ async def create_api_key(
     new_key = APIKey(
         user_id=current_user.id,
         provider=api_key_data.provider,
-        encrypted_key=encrypted_key,
-        name=api_key_data.name,
+        api_key=encrypted_key,
         is_active=True
     )
     
