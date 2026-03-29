@@ -8,6 +8,7 @@ and relationship resolution.
 
 from app.models.api_key import APIKey
 from app.models.conversation import Conversation
+from app.models.memory import Memory
 from app.models.message import Message
 from app.models.token_usage import TokenUsage
 from app.models.user import User
@@ -18,4 +19,5 @@ __all__ = [
     "Message",
     "APIKey",
     "TokenUsage",
+    "Memory",
 ]

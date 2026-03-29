@@ -64,9 +64,19 @@ class EmbeddingService:
 
         Returns:
             List[float]: The embedding vector as a list of floats.
+            
+        Raises:
+            ValueError: If text is empty or None.
+            Exception: If embedding generation fails.
         """
-        embedding = self.model.encode(text, convert_to_numpy=True)
-        return embedding.tolist()
+        if not text or not text.strip():
+            raise ValueError("Text cannot be empty for embedding generation")
+        
+        try:
+            embedding = self.model.encode(text, convert_to_numpy=True)
+            return embedding.tolist()
+        except Exception as e:
+            raise Exception(f"Failed to generate embedding: {str(e)}")
 
     def batch_generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
@@ -80,9 +90,24 @@ class EmbeddingService:
 
         Returns:
             List[List[float]]: List of embedding vectors.
+            
+        Raises:
+            ValueError: If texts list is empty or contains invalid entries.
+            Exception: If embedding generation fails.
         """
-        embeddings = self.model.encode(texts, convert_to_numpy=True)
-        return embeddings.tolist()
+        if not texts:
+            raise ValueError("Texts list cannot be empty")
+        
+        # Filter out empty texts
+        valid_texts = [t for t in texts if t and t.strip()]
+        if not valid_texts:
+            raise ValueError("All texts are empty")
+        
+        try:
+            embeddings = self.model.encode(valid_texts, convert_to_numpy=True)
+            return embeddings.tolist()
+        except Exception as e:
+            raise Exception(f"Failed to generate batch embeddings: {str(e)}")
 
 
 class ChromaDBService:

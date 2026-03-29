@@ -17,6 +17,8 @@ from app.services.llm_router import (
     OllamaProvider,
     RouterAPIProvider
 )
+from app.services.memory_service import get_memory_service
+from app.services.memory_classifier import get_memory_classifier
 from app.utils.security import decrypt_api_key
 
 
@@ -26,6 +28,131 @@ class ChatService:
     def __init__(self, db: Session):
         self.db = db
         self.router = LLMRouter()
+        self.memory_service = get_memory_service()
+        self.memory_classifier = get_memory_classifier(self.router)
+    
+    def _format_memories_for_context(self, memories: List) -> str:
+        """Format memories for injection into system prompt"""
+        if not memories:
+            return ""
+        
+        memory_text = "\n\n[RELEVANT MEMORIES]\n"
+        memory_text += "The following information has been remembered from previous conversations:\n\n"
+        
+        for memory in memories:
+            memory_type_label = memory.memory_type.value.upper()
+            category_label = memory.category.value.capitalize()
+            memory_text += f"[{memory_type_label} - {category_label}] {memory.content}\n"
+        
+        memory_text += "\nPlease use this information to provide more personalized and context-aware responses.\n"
+        return memory_text
+    
+    async def _search_relevant_memories(self, user_id: int, query: str, top_k: int = 5) -> List:
+        """Search for relevant memories based on the query"""
+        try:
+            memories = self.memory_service.search_memories(
+                db=self.db,
+                user_id=user_id,
+                query=query,
+                top_k=top_k
+            )
+            return memories
+        except Exception as e:
+            print(f"Error searching memories: {e}")
+            return []
+    
+    async def _detect_and_store_explicit_memory(
+        self,
+        user_id: int,
+        message_content: str,
+        conversation_id: int,
+        message_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """Detect and store explicit memory requests"""
+        is_explicit, content = self.memory_classifier.detect_explicit_memory(message_content)
+        
+        if is_explicit and content:
+            try:
+                category = self.memory_classifier.categorize_memory(content)
+                importance = self.memory_classifier.calculate_importance(
+                    content, "explicit", category
+                )
+                
+                memory = self.memory_service.add_memory(
+                    db=self.db,
+                    user_id=user_id,
+                    content=content,
+                    memory_type="explicit",
+                    category=category,
+                    importance=importance,
+                    source_conversation_id=conversation_id,
+                    source_message_id=message_id
+                )
+                
+                return {
+                    "id": memory.id,
+                    "content": memory.content,
+                    "type": memory.memory_type.value,
+                    "category": memory.category.value
+                }
+            except Exception as e:
+                print(f"Error storing explicit memory: {e}")
+        
+        return None
+    
+    async def _extract_and_store_automatic_memories(
+        self,
+        user_id: int,
+        user_message: str,
+        assistant_response: str,
+        conversation_id: int,
+        message_id: int,
+        api_key: str,
+        model: str
+    ) -> List[Dict[str, Any]]:
+        """Extract and store automatic memories from conversation"""
+        try:
+            extracted_memories = await self.memory_classifier.extract_automatic_memories(
+                message=user_message,
+                response=assistant_response,
+                api_key=api_key,
+                model=model
+            )
+            
+            stored_memories = []
+            for mem_data in extracted_memories:
+                try:
+                    importance = self.memory_classifier.calculate_importance(
+                        mem_data["content"],
+                        "automatic",
+                        mem_data["category"]
+                    )
+                    
+                    memory = self.memory_service.add_memory(
+                        db=self.db,
+                        user_id=user_id,
+                        content=mem_data["content"],
+                        memory_type="automatic",
+                        category=mem_data["category"],
+                        importance=importance,
+                        source_conversation_id=conversation_id,
+                        source_message_id=message_id
+                    )
+                    
+                    stored_memories.append({
+                        "id": memory.id,
+                        "content": memory.content,
+                        "type": memory.memory_type.value,
+                        "category": memory.category.value
+                    })
+                except Exception as e:
+                    print(f"Error storing automatic memory: {e}")
+                    continue
+            
+            return stored_memories
+        except Exception as e:
+            print(f"Error extracting automatic memories: {e}")
+            return []
     
     def _get_user_api_key(self, user_id: int, provider: str) -> Optional[str]:
         """Get decrypted API key for user and provider"""
@@ -103,15 +230,23 @@ class ChatService:
         # Get conversation history
         messages = self._get_conversation_messages(conversation.id)
         
+        # Search for relevant memories
+        relevant_memories = await self._search_relevant_memories(user_id, message_content, top_k=5)
+        
         # Build messages array for LLM
         llm_messages = []
         
-        # Add system prompt if provided
-        if system_prompt:
-            llm_messages.append({
-                "role": "system",
-                "content": system_prompt
-            })
+        # Build enhanced system prompt with memories
+        enhanced_system_prompt = system_prompt or "You are a helpful AI assistant."
+        if relevant_memories:
+            memory_context = self._format_memories_for_context(relevant_memories)
+            enhanced_system_prompt = enhanced_system_prompt + memory_context
+        
+        # Add system prompt
+        llm_messages.append({
+            "role": "system",
+            "content": enhanced_system_prompt
+        })
         
         # Add conversation history
         for msg in messages:
@@ -188,11 +323,50 @@ class ChatService:
             self.db.commit()
             self.db.refresh(assistant_message)
             
-            return {
+            # Detect and store explicit memory
+            explicit_memory = await self._detect_and_store_explicit_memory(
+                user_id=user_id,
+                message_content=message_content,
+                conversation_id=conversation.id,
+                message_id=user_message.id
+            )
+            
+            # Extract and store automatic memories
+            api_key = self._get_user_api_key(user_id, provider)
+            automatic_memories = []
+            if api_key:
+                automatic_memories = await self._extract_and_store_automatic_memories(
+                    user_id=user_id,
+                    user_message=message_content,
+                    assistant_response=response["content"],
+                    conversation_id=conversation.id,
+                    message_id=assistant_message.id,
+                    api_key=api_key,
+                    model=model
+                )
+            
+            # Prepare response with memory information
+            result = {
                 "message": assistant_message,
                 "conversation_id": conversation.id,
-                "usage": response["usage"]
+                "usage": response["usage"],
+                "memories_used": [
+                    {
+                        "id": mem.id,
+                        "content": mem.content,
+                        "type": mem.memory_type.value,
+                        "category": mem.category.value
+                    } for mem in relevant_memories
+                ] if relevant_memories else []
             }
+            
+            # Add created memories to response
+            if explicit_memory:
+                result["explicit_memory_created"] = explicit_memory
+            if automatic_memories:
+                result["automatic_memories_created"] = automatic_memories
+            
+            return result
             
         except Exception as e:
             self.db.rollback()

@@ -26,6 +26,7 @@ class User(Base):
         conversations: Relationship to user's conversations.
         api_keys: Relationship to user's stored API keys.
         token_usages: Relationship to user's token usage records.
+        memories: Relationship to user's memories.
     """
 
     __tablename__ = "users"
@@ -51,6 +52,9 @@ class User(Base):
     )
     token_usages = relationship(
         "TokenUsage", back_populates="user", cascade="all, delete-orphan"
+    )
+    memories = relationship(
+        "Memory", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
