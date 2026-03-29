@@ -87,17 +87,14 @@ def create_app() -> FastAPI:
     # -------------------------------------------------------------------------
     # Router Registration
     # -------------------------------------------------------------------------
-    from app.routers import auth, conversations, chat, api_keys, memory
+    from app.routers import auth, conversations, chat, api_keys, memory, usage
 
     app.include_router(auth.router)
     app.include_router(conversations.router)
     app.include_router(chat.router)
     app.include_router(api_keys.router)
     app.include_router(memory.router)
-
-    # Future routers (to be added in later phases):
-    # from app.routers import usage
-    # app.include_router(usage.router, prefix="/api/usage", tags=["Usage"])
+    app.include_router(usage.router)
 
     return app
 

@@ -2,8 +2,11 @@
 Chat Router - API endpoints for chat completion
 """
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, AsyncGenerator
+import json
+import asyncio
 
 from app.database import get_db
 from app.models.user import User
@@ -62,6 +65,72 @@ async def chat_complete(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing message: {str(e)}"
         )
+
+
+@router.post("/stream")
+async def chat_stream(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Stream chat completion responses using Server-Sent Events (SSE).
+    
+    This endpoint streams response chunks as they arrive from the LLM,
+    providing real-time feedback to the user.
+    """
+    
+    async def generate_stream() -> AsyncGenerator[str, None]:
+        """Generate SSE stream of chat responses"""
+        chat_service = ChatService(db)
+        
+        try:
+            # Process message with streaming
+            async for chunk in chat_service.process_message_stream(
+                user_id=current_user.id,
+                conversation_id=request.conversation_id,
+                message_content=request.message,
+                model=request.model,
+                provider=request.provider,
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
+                system_prompt=request.system_prompt
+            ):
+                # Format as SSE
+                data = json.dumps(chunk)
+                yield f"data: {data}\n\n"
+                
+                # Small delay to prevent overwhelming the client
+                await asyncio.sleep(0.01)
+            
+            # Send completion event
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            
+        except ValueError as e:
+            error_data = json.dumps({
+                'type': 'error',
+                'error': str(e),
+                'code': 'validation_error'
+            })
+            yield f"data: {error_data}\n\n"
+            
+        except Exception as e:
+            error_data = json.dumps({
+                'type': 'error',
+                'error': f"Error processing message: {str(e)}",
+                'code': 'server_error'
+            })
+            yield f"data: {error_data}\n\n"
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
 
 
 @router.get("/models", response_model=ModelsResponse)

@@ -59,17 +59,13 @@ async def create_conversation(
     chat_service = ChatService(db)
     new_conversation = chat_service.create_conversation(
         user_id=current_user.id,
-        title=conversation.title,
-        model=conversation.model,
-        provider=conversation.provider
+        title=conversation.title
     )
     
     return ConversationResponse(
         id=new_conversation.id,
         user_id=new_conversation.user_id,
         title=new_conversation.title,
-        model=new_conversation.model,
-        provider=new_conversation.provider,
         created_at=new_conversation.created_at,
         updated_at=new_conversation.updated_at,
         message_count=0,

@@ -1,7 +1,7 @@
 """
 Chat Service - Handles chat orchestration and message management
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, AsyncGenerator
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from datetime import datetime
@@ -19,6 +19,7 @@ from app.services.llm_router import (
 )
 from app.services.memory_service import get_memory_service
 from app.services.memory_classifier import get_memory_classifier
+from app.services.token_tracker import TokenTracker
 from app.utils.security import decrypt_api_key
 
 
@@ -30,6 +31,7 @@ class ChatService:
         self.router = LLMRouter()
         self.memory_service = get_memory_service()
         self.memory_classifier = get_memory_classifier(self.router)
+        self.token_tracker = TokenTracker(db)
     
     def _format_memories_for_context(self, memories: List) -> str:
         """Format memories for injection into system prompt"""
@@ -219,9 +221,7 @@ class ChatService:
             # Create new conversation
             conversation = Conversation(
                 user_id=user_id,
-                title="New Conversation",
-                model=model,
-                provider=provider
+                title="New Conversation"
             )
             self.db.add(conversation)
             self.db.commit()
@@ -297,17 +297,17 @@ class ChatService:
             )
             self.db.add(assistant_message)
             
-            # Save token usage
-            token_usage = TokenUsage(
+            # Track token usage
+            self.token_tracker.track_usage(
                 user_id=user_id,
                 conversation_id=conversation.id,
-                model=response.get("model", model),
+                message_id=str(assistant_message.id),
                 provider=provider,
+                model=response.get("model", model),
                 prompt_tokens=response["usage"]["prompt_tokens"],
                 completion_tokens=response["usage"]["completion_tokens"],
                 total_tokens=response["usage"]["total_tokens"]
             )
-            self.db.add(token_usage)
             
             # Update conversation title if it's the first message
             if conversation.title == "New Conversation" and len(messages) == 0:
@@ -372,6 +372,209 @@ class ChatService:
             self.db.rollback()
             raise Exception(f"Error processing message: {str(e)}")
     
+    async def process_message_stream(
+        self,
+        user_id: int,
+        conversation_id: Optional[int],
+        message_content: str,
+        model: str,
+        provider: str,
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+        system_prompt: Optional[str] = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Process a chat message and stream the response"""
+        
+        # Initialize provider
+        if not self._initialize_provider(user_id, provider):
+            raise ValueError(f"No active API key found for provider: {provider}")
+        
+        # Get or create conversation
+        if conversation_id:
+            conversation = self.db.query(Conversation).filter(
+                Conversation.id == conversation_id,
+                Conversation.user_id == user_id
+            ).first()
+            
+            if not conversation:
+                raise ValueError("Conversation not found")
+        else:
+            # Create new conversation
+            conversation = Conversation(
+                user_id=user_id,
+                title="New Conversation"
+            )
+            self.db.add(conversation)
+            self.db.commit()
+            self.db.refresh(conversation)
+            
+            # Send conversation created event
+            yield {
+                "type": "conversation_created",
+                "conversation_id": conversation.id
+            }
+        
+        # Get conversation history
+        messages = self._get_conversation_messages(conversation.id)
+        
+        # Search for relevant memories
+        relevant_memories = await self._search_relevant_memories(user_id, message_content, top_k=5)
+        
+        # Build messages array for LLM
+        llm_messages = []
+        
+        # Build enhanced system prompt with memories
+        enhanced_system_prompt = system_prompt or "You are a helpful AI assistant."
+        if relevant_memories:
+            memory_context = self._format_memories_for_context(relevant_memories)
+            enhanced_system_prompt = enhanced_system_prompt + memory_context
+        
+        # Add system prompt
+        llm_messages.append({
+            "role": "system",
+            "content": enhanced_system_prompt
+        })
+        
+        # Add conversation history
+        for msg in messages:
+            llm_messages.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+        
+        # Add current user message
+        llm_messages.append({
+            "role": "user",
+            "content": message_content
+        })
+        
+        # Save user message
+        user_message = Message(
+            conversation_id=conversation.id,
+            role="user",
+            content=message_content,
+            model=model,
+            provider=provider
+        )
+        self.db.add(user_message)
+        self.db.commit()
+        self.db.refresh(user_message)
+        
+        # Stream LLM response
+        full_response = ""
+        prompt_tokens = 0
+        completion_tokens = 0
+        
+        try:
+            async for chunk in self.router.chat_completion_stream(
+                provider_name=provider,
+                messages=llm_messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens
+            ):
+                if chunk.get("type") == "content":
+                    content = chunk.get("content", "")
+                    full_response += content
+                    
+                    # Send content chunk
+                    yield {
+                        "type": "content",
+                        "content": content
+                    }
+                elif chunk.get("type") == "usage":
+                    prompt_tokens = chunk.get("prompt_tokens", 0)
+                    completion_tokens = chunk.get("completion_tokens", 0)
+            
+            # Calculate total tokens
+            total_tokens = prompt_tokens + completion_tokens
+            
+            # If no usage info from stream, estimate tokens
+            if total_tokens == 0:
+                prompt_tokens = self.token_tracker.estimate_tokens(
+                    " ".join([m["content"] for m in llm_messages])
+                )
+                completion_tokens = self.token_tracker.estimate_tokens(full_response)
+                total_tokens = prompt_tokens + completion_tokens
+            
+            # Save assistant message
+            assistant_message = Message(
+                conversation_id=conversation.id,
+                role="assistant",
+                content=full_response,
+                model=model,
+                provider=provider,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens
+            )
+            self.db.add(assistant_message)
+            
+            # Track token usage
+            self.token_tracker.track_usage(
+                user_id=user_id,
+                conversation_id=conversation.id,
+                message_id=str(assistant_message.id),
+                provider=provider,
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens
+            )
+            
+            # Update conversation title if it's the first message
+            if conversation.title == "New Conversation" and len(messages) == 0:
+                title = message_content[:50]
+                if len(message_content) > 50:
+                    title += "..."
+                conversation.title = title
+            
+            # Update conversation timestamp
+            conversation.updated_at = datetime.utcnow()
+            
+            self.db.commit()
+            self.db.refresh(assistant_message)
+            
+            # Send completion event with usage
+            yield {
+                "type": "complete",
+                "message_id": assistant_message.id,
+                "conversation_id": conversation.id,
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens
+                }
+            }
+            
+            # Process memories in background (don't block stream)
+            # Note: In production, this should be done in a background task
+            try:
+                await self._detect_and_store_explicit_memory(
+                    user_id=user_id,
+                    message_content=message_content,
+                    conversation_id=conversation.id,
+                    message_id=user_message.id
+                )
+                
+                api_key = self._get_user_api_key(user_id, provider)
+                if api_key:
+                    await self._extract_and_store_automatic_memories(
+                        user_id=user_id,
+                        user_message=message_content,
+                        assistant_response=full_response,
+                        conversation_id=conversation.id,
+                        message_id=assistant_message.id,
+                        api_key=api_key,
+                        model=model
+                    )
+            except Exception as e:
+                print(f"Error processing memories: {e}")
+            
+        except Exception as e:
+            self.db.rollback()
+            raise Exception(f"Error streaming message: {str(e)}")
+    
     def save_message(
         self,
         conversation_id: int,
@@ -421,16 +624,12 @@ class ChatService:
     def create_conversation(
         self,
         user_id: int,
-        title: str = "New Conversation",
-        model: Optional[str] = None,
-        provider: Optional[str] = None
+        title: str = "New Conversation"
     ) -> Conversation:
         """Create a new conversation"""
         conversation = Conversation(
             user_id=user_id,
-            title=title,
-            model=model,
-            provider=provider
+            title=title
         )
         self.db.add(conversation)
         self.db.commit()
