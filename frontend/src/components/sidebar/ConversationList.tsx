@@ -18,9 +18,9 @@ import {
 
 interface ConversationListProps {
   conversations: Conversation[]
-  activeConversationId: number | null
-  onSelectConversation: (id: number) => void
-  onDeleteConversation: (id: number) => void
+  activeConversationId: string | null
+  onSelectConversation: (id: string) => void
+  onDeleteConversation: (id: string) => void
 }
 
 interface GroupedConversations {

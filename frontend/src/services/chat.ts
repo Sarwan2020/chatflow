@@ -36,14 +36,14 @@ export async function createConversation(data: ConversationCreateRequest): Promi
 }
 
 /** Get a specific conversation with all messages. */
-export async function getConversation(conversationId: number): Promise<Conversation> {
+export async function getConversation(conversationId: string): Promise<Conversation> {
   const response = await api.get<Conversation>(`/conversations/${conversationId}`)
   return response.data
 }
 
 /** Update a conversation (e.g., change title). */
 export async function updateConversation(
-  conversationId: number,
+  conversationId: string,
   data: ConversationUpdateRequest
 ): Promise<Conversation> {
   const response = await api.patch<Conversation>(`/conversations/${conversationId}`, data)
@@ -51,7 +51,7 @@ export async function updateConversation(
 }
 
 /** Delete a conversation. */
-export async function deleteConversation(conversationId: number): Promise<void> {
+export async function deleteConversation(conversationId: string): Promise<void> {
   await api.delete(`/conversations/${conversationId}`)
 }
 
@@ -60,7 +60,7 @@ export async function deleteConversation(conversationId: number): Promise<void> 
 // ============================================================================
 
 /** Get messages for a conversation. */
-export async function getMessages(conversationId: number): Promise<Message[]> {
+export async function getMessages(conversationId: string): Promise<Message[]> {
   const conversation = await getConversation(conversationId)
   return conversation.messages || []
 }

@@ -19,10 +19,10 @@ import { useAuth } from '../hooks/useAuth'
 interface ChatContextValue extends ChatState {
   loadConversations: () => Promise<void>
   createNewConversation: (title?: string, model?: string, provider?: string) => Promise<Conversation>
-  switchConversation: (conversationId: number) => Promise<void>
+  switchConversation: (conversationId: string) => Promise<void>
   sendMessage: (message: string, model: string, provider: string, temperature?: number) => Promise<void>
-  deleteConversation: (conversationId: number) => Promise<void>
-  updateConversationTitle: (conversationId: number, title: string) => Promise<void>
+  deleteConversation: (conversationId: string) => Promise<void>
+  updateConversationTitle: (conversationId: string, title: string) => Promise<void>
   setSelectedModel: (model: string | null) => void
   setSelectedProvider: (provider: Provider | null) => void
   clearError: () => void
@@ -88,7 +88,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const switchConversation = useCallback(async (conversationId: number) => {
+  const switchConversation = useCallback(async (conversationId: string) => {
     try {
       setIsLoading(true)
       const conv = await chatService.getConversation(conversationId)
@@ -125,7 +125,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       // Update messages
       const userMessage: Message = {
-        id: Date.now(), // Temporary ID
+        id: `temp-${Date.now()}`, // Temporary ID
         conversation_id: response.conversation_id,
         role: 'user',
         content: message,
@@ -163,7 +163,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activeConversation])
 
-  const deleteConversation = useCallback(async (conversationId: number) => {
+  const deleteConversation = useCallback(async (conversationId: string) => {
     try {
       setIsLoading(true)
       await chatService.deleteConversation(conversationId)
@@ -184,7 +184,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activeConversation])
 
-  const updateConversationTitle = useCallback(async (conversationId: number, title: string) => {
+  const updateConversationTitle = useCallback(async (conversationId: string, title: string) => {
     try {
       const updated = await chatService.updateConversation(conversationId, { title })
       setConversations(prev =>
