@@ -85,6 +85,13 @@ def create_app() -> FastAPI:
         }
 
     # -------------------------------------------------------------------------
+    # Error Handling
+    # -------------------------------------------------------------------------
+    from app.middleware.error_handler import register_exception_handlers
+    
+    register_exception_handlers(app)
+
+    # -------------------------------------------------------------------------
     # Router Registration
     # -------------------------------------------------------------------------
     from app.routers import auth, conversations, chat, api_keys, memory, usage

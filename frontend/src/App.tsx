@@ -8,6 +8,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ChatProvider } from './contexts/ChatContext'
+import { SettingsProvider } from './contexts/SettingsContext'
+import { ToastProvider } from './contexts/ToastContext'
+import ToastContainer from './components/common/Toast'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ChatPage from './pages/ChatPage'
@@ -158,13 +161,18 @@ function AppRoutes() {
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <ChatProvider>
-          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-            <AppRoutes />
-          </div>
-        </ChatProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <SettingsProvider>
+            <ChatProvider>
+              <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+                <AppRoutes />
+                <ToastContainer />
+              </div>
+            </ChatProvider>
+          </SettingsProvider>
+        </AuthProvider>
+      </ToastProvider>
     </Router>
   )
 }
