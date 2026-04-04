@@ -93,8 +93,6 @@ async def get_conversation(
         id=conversation.id,
         user_id=conversation.user_id,
         title=conversation.title,
-        model=conversation.model,
-        provider=conversation.provider,
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,
         messages=[MessageResponse.from_orm(msg) for msg in messages]
