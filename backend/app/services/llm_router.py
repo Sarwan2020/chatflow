@@ -260,7 +260,7 @@ class RouterAPIProvider(BaseProvider):
     
     def __init__(self, api_key: str, base_url: str = "https://openrouter.ai/api/v1"):
         self.api_key = api_key
-        self.base_url = base_url
+        self.base_url = base_url.rstrip('/')  # Remove trailing slash if present
     
     async def chat_completion(
         self,
@@ -277,6 +277,8 @@ class RouterAPIProvider(BaseProvider):
                 headers = {
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
+                    "HTTP-Referer": "https://github.com/Sarwan2020/chatflow",
+                    "X-Title": "Multi-Modal AI Chat"
                 }
                 
                 payload = {

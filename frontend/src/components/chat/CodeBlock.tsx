@@ -32,8 +32,6 @@ import 'prismjs/components/prism-yaml';
 import 'prismjs/components/prism-markdown';
 import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-scss';
-import 'prismjs/components/prism-html';
-import 'prismjs/components/prism-xml';
 import 'prismjs/components/prism-php';
 import 'prismjs/components/prism-ruby';
 import 'prismjs/components/prism-swift';

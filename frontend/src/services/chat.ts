@@ -5,6 +5,7 @@
  */
 
 import api from './api'
+import { createFetchSSEConnection, type SSEConnection, type SSECallbacks } from './sse'
 import type {
   Conversation,
   ConversationCreateRequest,
@@ -72,6 +73,113 @@ export async function getMessages(conversationId: number): Promise<Message[]> {
 export async function sendMessage(request: ChatRequest): Promise<ChatResponse> {
   const response = await api.post<ChatResponse>('/chat/complete', request)
   return response.data
+}
+
+/**
+ * Stream a chat message and get real-time response chunks.
+ *
+ * @param request - Chat request data
+ * @param callbacks - SSE event callbacks
+ * @returns Promise<SSEConnection> object to manage the stream
+ */
+export async function streamMessage(
+  request: ChatRequest,
+  callbacks: SSECallbacks
+): Promise<SSEConnection> {
+  const token = localStorage.getItem('token')
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+  
+  // For POST requests with SSE, we need to use fetch directly
+  // since EventSource doesn't support POST
+  const url = `${baseURL}/chat/stream`
+  
+  const abortController = new AbortController()
+  let isClosed = false
+  let isConnected = false
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify(request),
+      signal: abortController.signal,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Stream request failed: ${response.statusText}`)
+    }
+
+    if (!response.body) {
+      throw new Error('Response body is null')
+    }
+
+    isConnected = true
+    callbacks.onOpen?.()
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    // Process stream in background
+    const processStream = async () => {
+      try {
+        while (!isClosed) {
+          const { done, value } = await reader.read()
+
+          if (done) {
+            callbacks.onComplete?.()
+            break
+          }
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6)
+              try {
+                const message = JSON.parse(data)
+                callbacks.onMessage(message)
+
+                if (message.type === 'done' || message.type === 'complete') {
+                  callbacks.onComplete?.()
+                  isClosed = true
+                  break
+                }
+              } catch (error) {
+                console.error('Error parsing SSE message:', error)
+              }
+            }
+          }
+        }
+      } catch (error) {
+        if (!isClosed) {
+          callbacks.onError?.(error as Error)
+        }
+      }
+    }
+
+    // Start processing
+    processStream()
+
+    return {
+      close: () => {
+        isClosed = true
+        isConnected = false
+        abortController.abort()
+        reader.cancel()
+      },
+      isConnected: () => isConnected,
+    }
+  } catch (error) {
+    callbacks.onError?.(error as Error)
+    throw error
+  }
 }
 
 /** Get available models based on user's API keys. */
