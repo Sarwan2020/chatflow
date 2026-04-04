@@ -17,8 +17,8 @@ class MemoryCreate(BaseModel):
     category: str = Field(..., description="Category: 'preference', 'fact', 'instruction', or 'context'")
     importance: float = Field(default=0.5, ge=0.0, le=1.0, description="Importance score between 0 and 1")
     meta: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
-    source_conversation_id: Optional[int] = Field(default=None, description="Source conversation ID")
-    source_message_id: Optional[int] = Field(default=None, description="Source message ID")
+    source_conversation_id: Optional[str] = Field(default=None, description="Source conversation ID (UUID)")
+    source_message_id: Optional[str] = Field(default=None, description="Source message ID (UUID)")
     
     @validator("memory_type")
     def validate_memory_type(cls, v):
@@ -60,8 +60,8 @@ class MemoryResponse(BaseModel):
     category: str
     importance: float
     meta: Optional[Dict[str, Any]]
-    source_conversation_id: Optional[int]
-    source_message_id: Optional[int]
+    source_conversation_id: Optional[str]  # UUID
+    source_message_id: Optional[str]  # UUID
     created_at: datetime
     updated_at: datetime
     

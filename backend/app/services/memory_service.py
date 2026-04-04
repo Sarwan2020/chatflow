@@ -36,8 +36,8 @@ class MemoryService:
         category: str,
         importance: float = 0.5,
         meta: Optional[Dict[str, Any]] = None,
-        source_conversation_id: Optional[int] = None,
-        source_message_id: Optional[int] = None,
+        source_conversation_id: Optional[str] = None,  # UUID
+        source_message_id: Optional[str] = None,  # UUID
     ) -> Memory:
         """
         Add a new memory to the database.

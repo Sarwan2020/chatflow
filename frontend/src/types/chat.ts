@@ -20,8 +20,8 @@ export interface MessageMetadata {
 
 /** A single message in a conversation. */
 export interface Message {
-  id: number;
-  conversation_id: number;
+  id: string;  // UUID
+  conversation_id: string;  // UUID
   role: MessageRole;
   content: string;
   model?: string | null;
@@ -41,7 +41,7 @@ export interface TokenUsage {
 
 /** A conversation containing messages. */
 export interface Conversation {
-  id: number;
+  id: string;  // UUID
   user_id: number;
   title: string;
   model?: string | null;
@@ -67,7 +67,7 @@ export interface ConversationUpdateRequest {
 
 /** Request payload for a chat completion. */
 export interface ChatRequest {
-  conversation_id?: number | null;
+  conversation_id?: string | null;  // UUID
   message: string;
   model: string;
   provider: string;
@@ -79,7 +79,7 @@ export interface ChatRequest {
 /** Response from chat completion */
 export interface ChatResponse {
   message: Message;
-  conversation_id: number;
+  conversation_id: string;  // UUID
   usage: TokenUsage;
 }
 

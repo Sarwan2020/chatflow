@@ -8,7 +8,7 @@ from datetime import datetime
 
 class MessageCreate(BaseModel):
     """Schema for creating a message"""
-    conversation_id: int
+    conversation_id: str  # UUID
     role: str = Field(..., pattern="^(user|assistant|system)$")
     content: str
     model: Optional[str] = None
@@ -20,8 +20,8 @@ class MessageCreate(BaseModel):
 
 class MessageResponse(BaseModel):
     """Schema for message response"""
-    id: int
-    conversation_id: int
+    id: str  # UUID
+    conversation_id: str  # UUID
     role: str
     content: str
     model: Optional[str] = None
@@ -37,7 +37,7 @@ class MessageResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     """Schema for chat completion request"""
-    conversation_id: Optional[int] = None
+    conversation_id: Optional[str] = None  # UUID
     message: str
     model: str
     provider: str
@@ -49,7 +49,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     """Schema for chat completion response"""
     message: MessageResponse
-    conversation_id: int
+    conversation_id: str  # UUID
     usage: Dict[str, int]
 
 

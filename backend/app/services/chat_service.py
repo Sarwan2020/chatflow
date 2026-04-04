@@ -67,8 +67,8 @@ class ChatService:
         self,
         user_id: int,
         message_content: str,
-        conversation_id: int,
-        message_id: int
+        conversation_id: str,  # UUID
+        message_id: str  # UUID
     ) -> Optional[Dict[str, Any]]:
         """Detect and store explicit memory requests"""
         is_explicit, content = self.memory_classifier.detect_explicit_memory(message_content)
@@ -107,8 +107,8 @@ class ChatService:
         user_id: int,
         user_message: str,
         assistant_response: str,
-        conversation_id: int,
-        message_id: int,
+        conversation_id: str,  # UUID
+        message_id: str,  # UUID
         api_key: str,
         model: str
     ) -> List[Dict[str, Any]]:
@@ -194,7 +194,7 @@ class ChatService:
     async def process_message(
         self,
         user_id: int,
-        conversation_id: Optional[int],
+        conversation_id: Optional[str],  # UUID
         message_content: str,
         model: str,
         provider: str,
@@ -290,8 +290,9 @@ class ChatService:
                 token_count=response["usage"]["total_tokens"]
             )
             self.db.add(assistant_message)
+            self.db.flush()  # Flush to get the message ID
             
-            # Track token usage
+            # Track token usage (now we have the message ID)
             self.token_tracker.track_usage(
                 user_id=user_id,
                 conversation_id=conversation.id,
@@ -369,7 +370,7 @@ class ChatService:
     async def process_message_stream(
         self,
         user_id: int,
-        conversation_id: Optional[int],
+        conversation_id: Optional[str],  # UUID
         message_content: str,
         model: str,
         provider: str,
@@ -497,8 +498,9 @@ class ChatService:
                 token_count=total_tokens
             )
             self.db.add(assistant_message)
+            self.db.flush()  # Flush to get the message ID
             
-            # Track token usage
+            # Track token usage (now we have the message ID)
             self.token_tracker.track_usage(
                 user_id=user_id,
                 conversation_id=conversation.id,
@@ -565,7 +567,7 @@ class ChatService:
     
     def save_message(
         self,
-        conversation_id: int,
+        conversation_id: str,  # UUID
         role: str,
         content: str,
         model: Optional[str] = None,
@@ -590,7 +592,7 @@ class ChatService:
         self.db.refresh(message)
         return message
     
-    def get_conversation_messages(self, conversation_id: int, user_id: int) -> List[Message]:
+    def get_conversation_messages(self, conversation_id: str, user_id: int) -> List[Message]:
         """Get all messages for a conversation"""
         # Verify conversation belongs to user
         conversation = self.db.query(Conversation).filter(
@@ -603,7 +605,7 @@ class ChatService:
         
         return self._get_conversation_messages(conversation_id)
     
-    def _get_conversation_messages(self, conversation_id: int) -> List[Message]:
+    def _get_conversation_messages(self, conversation_id: str) -> List[Message]:
         """Internal method to get messages without user verification"""
         return self.db.query(Message).filter(
             Message.conversation_id == conversation_id
@@ -630,7 +632,7 @@ class ChatService:
             Conversation.user_id == user_id
         ).order_by(desc(Conversation.updated_at)).all()
     
-    def get_conversation(self, conversation_id: int, user_id: int) -> Optional[Conversation]:
+    def get_conversation(self, conversation_id: str, user_id: int) -> Optional[Conversation]:
         """Get a specific conversation"""
         return self.db.query(Conversation).filter(
             Conversation.id == conversation_id,
@@ -639,7 +641,7 @@ class ChatService:
     
     def update_conversation(
         self,
-        conversation_id: int,
+        conversation_id: str,  # UUID
         user_id: int,
         title: Optional[str] = None
     ) -> Optional[Conversation]:
@@ -656,7 +658,7 @@ class ChatService:
         self.db.refresh(conversation)
         return conversation
     
-    def delete_conversation(self, conversation_id: int, user_id: int) -> bool:
+    def delete_conversation(self, conversation_id: str, user_id: int) -> bool:
         """Delete a conversation and all its messages"""
         conversation = self.get_conversation(conversation_id, user_id)
         if not conversation:
